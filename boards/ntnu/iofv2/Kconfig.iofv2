@@ -1,0 +1,2 @@
+config BOARD_IOFV2
+	select SOC_NRF9160_SICA

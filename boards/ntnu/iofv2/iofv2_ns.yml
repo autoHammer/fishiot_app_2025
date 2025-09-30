@@ -1,0 +1,10 @@
+identifier: iofv2/nrf9160/ns
+name: Internet of Fish v2
+vendor: ntnu
+type: mcu
+arch: arm
+ram: 128
+flash: 212
+toolchain:
+  - zephyr
+supported: []
