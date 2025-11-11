@@ -54,7 +54,6 @@ uint32_t adc_read_voltage(void)
     uint32_t val_mv = (uint32_t)buf;
     /* Convert raw value to mV*/
     err = adc_raw_to_millivolts_dt(&adc_channel, &val_mv);
-    val_mv *= 3.4;
    
     return val_mv;
 
