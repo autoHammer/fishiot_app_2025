@@ -35,6 +35,18 @@
 		};
 	};
 
+	rs485_ctrl: rs485_ctrl { 
+		compatible = "gpio-leds"; 
+		re_low_pin: re_low_pin { 
+			gpios = <&gpio0 14 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; 
+			label = "RS485 RE Low"; 
+		}; 
+		de_high_pin: de_high_pin { 
+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; 
+			label = "RS485 DE High"; 
+		}; 
+	};
+
 	buttons {
 		compatible = "gpio-keys";
 		button1: button_1 {
@@ -55,6 +67,8 @@
 		led3 = &led4;
 		sw0  = &button1;
 		sw1  = &button2;
+		dehighpin = &de_high_pin;
+		relowpin = &re_low_pin;
 		bootloader-led0 = &led1;
 		mcuboot-button0 = &button1;
 		mcuboot-led0 = &led1;
@@ -84,7 +98,14 @@
 	pinctrl-names = "default", "sleep";
 	current-speed = <115200>;
 	label = "USB Uart debug";
+};
 
+&uart1 {
+	status = "okay";
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-1 = <&uart1_sleep>;
+	pinctrl-names = "default", "sleep";
+	current-speed = <115200>;
 };
 
 &i2c2 {
