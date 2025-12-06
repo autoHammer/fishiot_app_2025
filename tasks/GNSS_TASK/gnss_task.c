@@ -8,8 +8,6 @@
 #include "adc.h"
 #include <stdlib.h>
 
-
-
 LOG_MODULE_DECLARE(FishIoT);
 
 extern struct k_sem mqtt_lock_mutex; 
@@ -41,9 +39,6 @@ void gnss_error_timer_function(struct k_timer *timer_id){
 }
 
 
-
-
-
 void gnss_event_handler(int event)
 {
 	int err;
@@ -51,8 +46,13 @@ void gnss_event_handler(int event)
 	/*On a PVT event, confirm if PVT data is a valid fix */
 	case NRF_MODEM_GNSS_EVT_PVT:
 		LOG_INF("Searching...");
-		/*Print satellite information */
+		err = nrf_modem_gnss_read(&pvt_data, sizeof(pvt_data), NRF_MODEM_GNSS_DATA_PVT);
+		if (err) {
+			LOG_ERR("nrf_modem_gnss_read failed, err %d", err);
+			return;
+		}
 		
+		/*Print satellite information */
 		for (int i = 0; i < 12 ; i++) {
 			if (pvt_data.sv[i].signal != 0) {
 				LOG_INF("sv: %d, cn0: %d", pvt_data.sv[i].sv, pvt_data.sv[i].cn0);
@@ -60,11 +60,15 @@ void gnss_event_handler(int event)
 			}
 		}
 		LOG_INF("Number of current satellites: %d", num_satellites);
-		err = nrf_modem_gnss_read(&pvt_data, sizeof(pvt_data), NRF_MODEM_GNSS_DATA_PVT);
-		if (err) {
-			LOG_ERR("nrf_modem_gnss_read failed, err %d", err);
-			return;
+
+		if (pvt_data.flags & NRF_MODEM_GNSS_PVT_FLAG_NOT_ENOUGH_WINDOW_TIME) {
+			LOG_WRN("GNSS windows too short (<10 s), LTE is blocking GNSS");
 		}
+
+		if (pvt_data.flags & NRF_MODEM_GNSS_PVT_FLAG_DEADLINE_MISSED) {
+			LOG_WRN("No GNSS window since last PVT (DEADLINE_MISSED)");
+		}
+
 		if (pvt_data.flags & NRF_MODEM_GNSS_PVT_FLAG_FIX_VALID) {
 			// gnss_activation_cntr++;
 			print_fix_data(&pvt_data);
@@ -110,6 +114,37 @@ void gnss_event_handler(int event)
 		// k_mutex_unlock(&mqtt_lock_mutex);
 
 		break;
+	/* GNSS module is requesting AGNSS service, currently only for debugging*/
+	case NRF_MODEM_GNSS_EVT_AGNSS_REQ:
+		struct nrf_modem_gnss_agnss_data_frame req;
+
+		if (nrf_modem_gnss_read(&req, sizeof(req), NRF_MODEM_GNSS_DATA_AGNSS_REQ) == 0) {
+			/* If the request is only NeQuick/Integrity with no SV data, log and ignore */
+			if (req.system_count > 0 &&
+				req.system[0].sv_mask_ephe == 0 &&
+				req.system[0].sv_mask_alm == 0 &&
+				(req.data_flags & ~(NRF_MODEM_GNSS_AGNSS_NEQUICK_REQUEST |
+									NRF_MODEM_GNSS_AGNSS_INTEGRITY_REQUEST)) == 0) {
+				LOG_INF("AGNSS REQ: only NeQuick/Integrity → ignoring");
+			} else {
+				LOG_WRN("AGNSS REQUIRED: GNSS requests AGNSS service (not implemented)");
+				LOG_INF("AGNSS REQ: data_flags=0x%08x, system_count=%d",
+						req.data_flags, req.system_count);
+				for (int i = 0; i < req.system_count; i++) {
+					LOG_INF("  sys[%d]: system_id=%u sv_ephe=0x%016llx sv_alm=0x%016llx",
+							i,
+							req.system[i].system_id,
+							(unsigned long long)req.system[i].sv_mask_ephe,
+							(unsigned long long)req.system[i].sv_mask_alm);
+				}
+			}
+		} else {
+			LOG_WRN("AGNSS REQ: failed to read request details");
+		}
+		break;
+	case NRF_MODEM_GNSS_EVT_BLOCKED:
+		LOG_WRN("GNSS blocked. (Likely by LTE)");
+		break;
 	default:
 		break;
 	}
@@ -120,7 +155,6 @@ void gnss_event_handler(int event)
 uint8_t gnss_task_agps_process_start(void){
 
 	uint8_t err;
-
 	err = agps_receive_process_data();
 	if(err){
 		LOG_ERR("GNSS_THREAD: Failed to receive and process AGPS data");
