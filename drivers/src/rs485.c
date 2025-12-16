@@ -32,32 +32,51 @@ static bool enablerecieve;
 extern bool RTC_TIME_SET;
 
 
+
+static inline void rs485_set_rx_mode(void)
+{
+    gpio_pin_set_dt(&TXPin, 0);  // DE off
+    gpio_pin_set_dt(&RXpin, 1);  // RX on
+}
+
+static inline void rs485_set_tx_mode(void)
+{
+    gpio_pin_set_dt(&RXpin, 0);  // RX off
+    gpio_pin_set_dt(&TXPin, 1);  // DE on
+}
+
+
 /*
  * Print a null-terminated string character by character to the UART interface
  */
 void print_uart(char *buf)
 {
 	int msg_len = strlen(buf);
-	gpio_pin_set_dt(&RXpin, 1);
-	gpio_pin_set_dt(&TXPin, 1);
+
+	rs485_set_tx_mode();
+
 	for (int i = 0; i < msg_len; i++) {
 		uart_poll_out(uart_dev, buf[i]);
 		k_sleep(K_MSEC(1));
 	}
-	gpio_pin_set_dt(&TXPin, 0);
-	gpio_pin_set_dt(&RXpin, 0);
+
+    k_sleep(K_MSEC(2));
+
+    rs485_set_rx_mode();
 }
 
 void print_uart_commandmode(char *buf)
 {
 	int msg_len = strlen(buf);
-	gpio_pin_set_dt(&RXpin, 1);
-	gpio_pin_set_dt(&TXPin, 1);
+
+	rs485_set_tx_mode();
+
 	for (int i = 0; i < msg_len; i++) {
 		uart_poll_out(uart_dev, buf[i]);
 	}
-	gpio_pin_set_dt(&TXPin, 0);
-	gpio_pin_set_dt(&RXpin, 0);
+	k_sleep(K_MSEC(2));
+
+	rs485_set_rx_mode();
 }
 
 
@@ -234,21 +253,21 @@ void serial_cb(const struct device *dev, void *user_data)
 			/* terminate string */
 			rx_buf[rx_buf_pos] = '\0';
 
-			/* if queue is full, message is silently dropped */
-			//place it in queue only if its LOG or Tag detection
-			if(strlen(rx_buf)>20 && enablerecieve){
-				// LOG_INF("uptime seconds in interrupt: %lld", k_uptime_get());
-				k_msgq_put(&uart_msgq, &rx_buf, K_NO_WAIT);
-				if(RTC_TIME_SET)
-					k_sem_give(&tbr_sync_task_sem);
-				k_sem_give(&uart_rec_sem);
+			/* During init, keep buffer intact for rs485_extractserialnnumber(). */
+			if (enablerecieve) {
+				if (strlen(rx_buf) > 20) {
+					k_msgq_put(&uart_msgq, &rx_buf, K_NO_WAIT);
+					if(RTC_TIME_SET)
+						k_sem_give(&tbr_sync_task_sem);
+					k_sem_give(&uart_rec_sem);
+				}
+				/* reset only when actively processing messages */
+				rx_buf_pos = 0;
 			}
-			/* reset the buffer (it was copied to the msgq) */
-			rx_buf_pos = 0;
-			//check if the size of messages is greater than 5
 				
 		} else if (rx_buf_pos < (sizeof(rx_buf) - 1)) {
-			if ((c != '\n') || (c != '\r')){
+			/* keep LF/CR out of buffer */
+			if ((c != '\n') && (c != '\r')) {
 				rx_buf[rx_buf_pos++] = c;
 			}
 		}
@@ -286,8 +305,7 @@ uint8_t rs485_init(void)
 	}
 
 	
-	gpio_pin_set_dt(&TXPin, 0);
-	gpio_pin_set_dt(&RXpin, 0);
+	rs485_set_rx_mode();
 
 	/* configure interrupt and callback to receive data */
 	ret = uart_irq_callback_user_data_set(uart_dev, serial_cb, NULL);
@@ -308,11 +326,13 @@ retry:
 		printk("Something wrong with TBRLive...\n");
 		return 1;
 	}
+
+	rs485_set_rx_mode();
 	uart_irq_rx_enable(uart_dev);
-	print_uart("?\r\n");
+	print_uart("?");
+
 
 	k_sleep(K_MSEC(100));
-
 
 	uart_irq_rx_disable(uart_dev);
 
@@ -326,5 +346,3 @@ retry:
 	enablerecieve = true;
 	return 0;
 }
-
-
