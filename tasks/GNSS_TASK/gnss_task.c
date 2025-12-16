@@ -119,24 +119,29 @@ void gnss_event_handler(int event)
 		struct nrf_modem_gnss_agnss_data_frame req;
 
 		if (nrf_modem_gnss_read(&req, sizeof(req), NRF_MODEM_GNSS_DATA_AGNSS_REQ) == 0) {
-			/* If the request is only NeQuick/Integrity with no SV data, log and ignore */
-			if (req.system_count > 0 &&
-				req.system[0].sv_mask_ephe == 0 &&
-				req.system[0].sv_mask_alm == 0 &&
-				(req.data_flags & ~(NRF_MODEM_GNSS_AGNSS_NEQUICK_REQUEST |
-									NRF_MODEM_GNSS_AGNSS_INTEGRITY_REQUEST)) == 0) {
-				LOG_INF("AGNSS REQ: only NeQuick/Integrity → ignoring");
-			} else {
-				LOG_WRN("AGNSS REQUIRED: GNSS requests AGNSS service (not implemented)");
-				LOG_INF("AGNSS REQ: data_flags=0x%08x, system_count=%d",
-						req.data_flags, req.system_count);
-				for (int i = 0; i < req.system_count; i++) {
-					LOG_INF("  sys[%d]: system_id=%u sv_ephe=0x%016llx sv_alm=0x%016llx",
-							i,
-							req.system[i].system_id,
-							(unsigned long long)req.system[i].sv_mask_ephe,
-							(unsigned long long)req.system[i].sv_mask_alm);
-				}
+			uint64_t ephe_mask = 0, alm_mask = 0;
+
+			for (int i = 0; i < req.system_count; i++) {
+				ephe_mask |= req.system[i].sv_mask_ephe;
+				alm_mask  |= req.system[i].sv_mask_alm;
+			}
+
+			/* No ephemeris/almanac requested -> ignore quietly */
+			if (ephe_mask == 0 && alm_mask == 0) {
+				LOG_INF("AGNSS REQ: no ephemeris/almanac needed (flags=0x%08x) -> ignoring",
+						req.data_flags);
+				break;
+			}
+
+			LOG_WRN("AGNSS REQUIRED: GNSS requests AGNSS service (not implemented)");
+			LOG_INF("AGNSS REQ: data_flags=0x%08x, system_count=%d",
+					req.data_flags, req.system_count);
+			for (int i = 0; i < req.system_count; i++) {
+				LOG_INF("  sys[%d]: system_id=%u sv_ephe=0x%016llx sv_alm=0x%016llx",
+						i,
+						req.system[i].system_id,
+						(unsigned long long)req.system[i].sv_mask_ephe,
+						(unsigned long long)req.system[i].sv_mask_alm);
 			}
 		} else {
 			LOG_WRN("AGNSS REQ: failed to read request details");
