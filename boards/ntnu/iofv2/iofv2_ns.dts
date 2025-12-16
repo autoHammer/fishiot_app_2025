@@ -38,11 +38,11 @@
 	rs485_ctrl: rs485_ctrl { 
 		compatible = "gpio-leds"; 
 		re_low_pin: re_low_pin { 
-			gpios = <&gpio0 14 (GPIO_ACTIVE_LOW | GPIO_PULL_DOWN)>; 
+			gpios = <&gpio0 14 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; 
 			label = "RS485 RE Low"; 
 		}; 
 		de_high_pin: de_high_pin { 
-			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>; 
+			gpios = <&gpio0 15 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>; 
 			label = "RS485 DE High"; 
 		}; 
 	};
@@ -60,6 +60,22 @@
 		};
 	};
 
+	rtc {
+		compatible = "gpio-keys";
+		rtc_int: rtc_int_pin {
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+			label = "rtc_int";
+    	};
+
+		tbr_pps: tbr_pps_pin {
+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;	// TODO: double check if active high or low!
+			label = "tbr_pps";
+		};
+
+	};
+
+
+
 	aliases {
 		led0 = &led1;
 		led1 = &led2;
@@ -73,6 +89,8 @@
 		mcuboot-button0 = &button1;
 		mcuboot-led0 = &led1;
 		watchdog0 = &wdt0;
+		nintpinlow = &rtc_int;
+        tbrppspin  = &tbr_pps;
 	};
 
 	zephyr,user {
@@ -105,7 +123,9 @@
 	pinctrl-0 = <&uart1_default>;
 	pinctrl-1 = <&uart1_sleep>;
 	pinctrl-names = "default", "sleep";
-	current-speed = <115200>;
+	current-speed = <9600>;
+	parity = "none";
+	/* Flow control is off by default; keep 8N1 as per TBR Live docs. */
 };
 
 &i2c2 {
