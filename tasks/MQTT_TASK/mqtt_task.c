@@ -230,7 +230,7 @@ do_connect:
 	if (err < 0) {
 		LOG_ERR("Error in poll(): %d", errno);
 		connect_attempt++;
-		err = mqtt_disconnect(&client);
+		err = mqtt_disconnect(&client, NULL);
 		if (err) {
 			LOG_ERR("Could not disconnect MQTT client: %d", err);
 		}
@@ -243,7 +243,7 @@ do_connect:
 		LED_ERROR_CODE(MQTT_LIVE_ERROR);
 		LOG_ERR("Error in mqtt_live: %d", err);
 		connect_attempt++;
-		err = mqtt_disconnect(&client);
+		err = mqtt_disconnect(&client, NULL);
 		if (err) {
 			LOG_ERR("Could not disconnect MQTT client: %d", err);
 		}
@@ -257,7 +257,7 @@ do_connect:
 			LED_ERROR_CODE(MQTT_INPUT_ERROR);
 			LOG_ERR("Error in mqtt_input: %d", err);
 			connect_attempt++;
-			err = mqtt_disconnect(&client);
+			err = mqtt_disconnect(&client, NULL);
 			if (err) {
 				LOG_ERR("Could not disconnect MQTT client: %d", err);
 			}
@@ -268,7 +268,7 @@ do_connect:
 	if ((fds.revents & POLLERR) == POLLERR) {
 		connect_attempt++;
 		LOG_ERR("POLLERR");
-		err = mqtt_disconnect(&client);
+		err = mqtt_disconnect(&client, NULL);
 			if (err) {
 				LOG_ERR("Could not disconnect MQTT client: %d", err);
 			}
@@ -279,7 +279,7 @@ do_connect:
 	if ((fds.revents & POLLNVAL) == POLLNVAL) {
 		connect_attempt++;
 		LOG_ERR("POLLNVAL");
-		err = mqtt_disconnect(&client);
+		err = mqtt_disconnect(&client, NULL);
 			if (err) {
 				LOG_ERR("Could not disconnect MQTT client: %d", err);
 			}
@@ -300,7 +300,7 @@ do_connect:
 	}
 
 	LOG_INF("Disconnecting MQTT client");
-	err = mqtt_disconnect(&client);
+	err = mqtt_disconnect(&client, NULL);
 	if (err) {
 		LOG_ERR("Could not disconnect MQTT client: %d", err);
 	}
