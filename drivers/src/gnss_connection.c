@@ -41,7 +41,7 @@ void data_formatter(struct nrf_modem_gnss_pvt_data_frame *pvt_data){
 
 
 	strcat(str, "\r\nAltitude: ");
-	sprintf(temporary, "%.01f", pvt_data->altitude);
+	sprintf(temporary, "%.01f", (double)pvt_data->altitude);
 	strcat(str, temporary);
 }
 
@@ -50,7 +50,7 @@ void print_fix_data(struct nrf_modem_gnss_pvt_data_frame *pvt_data)
 {
 	LOG_INF("Latitude:       %.06f", pvt_data->latitude);
 	LOG_INF("Longitude:      %.06f", pvt_data->longitude);
-	LOG_INF("Altitude:       %.01f m", pvt_data->altitude);
+	LOG_INF("Altitude:       %.01f m", (double)pvt_data->altitude);
 	LOG_INF("Time (UTC):     %02u:%02u:%02u.%03u",
 	       pvt_data->datetime.hour,
 	       pvt_data->datetime.minute,
@@ -105,7 +105,8 @@ int agps_receive_process_data(void){
 		LOG_ERR("Unsuccessful rest data get, error %d", err);
         return 1;
 	}
-	LOG_INF("%s",recv_buffer);
+
+	//LOG_INF("receive buffer: %s",recv_buffer);
 
 	LOG_INF("Starting to process AGPS data...");
 	err = nrf_cloud_agnss_process(result.buf, result.agnss_sz);
@@ -151,7 +152,7 @@ uint8_t gnss_periodic_start(void)
 }
 int gnss_init_and_start(void)
 {
-
+	int err;
 	/* Set the modem mode to normal */
 	if (lte_lc_func_mode_set(LTE_LC_FUNC_MODE_NORMAL) != 0) {
 		LOG_ERR("Failed to activate GNSS functional mode");
@@ -180,7 +181,7 @@ int gnss_init_and_start(void)
     .apply_start_time = false
 	};
 
-	int err = nrf_modem_gnss_1pps_enable(&pps_config);
+	err = nrf_modem_gnss_1pps_enable(&pps_config);
 	if(err){
 		LOG_INF("Failed to enable 1pps");
 	}
