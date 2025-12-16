@@ -14,7 +14,7 @@
 #include <zephyr/logging/log.h>
 
 #include <modem/modem_key_mgmt.h>
-#include "certificate.h"
+#include "certificate.h"	// generate certificate.h using server_certificate.crt if file is missing
 #include "mqtt_connection.h"
 
 static struct mqtt_utf8 pass,name;
@@ -236,7 +236,7 @@ int client_init(struct mqtt_client *client)
 	client->tx_buf_size = sizeof(tx_buffer);
 	
 	//NON_SECURE OR TLS
-	// #if(CONFIG_MQTT_LIB_TLS)
+	#if(CONFIG_MQTT_LIB_TLS)
 	struct mqtt_sec_config *tls_cfg = &(client->transport).tls.config;
 	static sec_tag_t sec_tag_list[] = { CONFIG_MQTT_TLS_SEC_TAG };
 
@@ -253,9 +253,9 @@ int client_init(struct mqtt_client *client)
 	tls_cfg->session_cache = IS_ENABLED(CONFIG_MQTT_TLS_SESSION_CACHING) ?
 					    TLS_SESSION_CACHE_ENABLED :
 					    TLS_SESSION_CACHE_DISABLED;
-	// #else
-	// client->transport.type = MQTT_TRANSPORT_NON_SECURE;
-	// #endif
+	#else
+	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
+	#endif
 	//get a pointer to the TLS configration 
 	
 	return err;
@@ -267,7 +267,8 @@ int fds_init(struct mqtt_client *c, struct pollfd *fds)
 {
 	if (c->transport.type == MQTT_TRANSPORT_NON_SECURE) {
 		fds->fd = c->transport.tcp.sock;
-	} else {
+	} 
+	else {
 		fds->fd = c->transport.tls.sock;
 	}
 
@@ -296,7 +297,7 @@ int certificate_provision(void)
 					 MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 					 CA_CERTIFICATE, 
 					 strlen(CA_CERTIFICATE));
-		LOG_INF("%s\n", err ? "mismatch" : "match");
+		LOG_INF("Comparing credentials: %s", err ? "Mismatch" : "Match");
 		if (!err) {
 			return 0;
 		}
