@@ -5,23 +5,25 @@
 * Author: Tsotne Karchava
 * Created: 10.10.2023
 */
-
+#include <nrf_modem_at.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/kernel.h>
 #include <date_time.h>
 #include <zephyr/sys/reboot.h>
 //LTE
 #include <modem/nrf_modem_lib.h>
 #include <modem/lte_lc.h>
-//header file for MQTT
-// #include "rtc.h"
+
 #include "leds.h"
+#include "adc.h"
+#include "rtc.h"
 #include "structs.h"
 #include "rs485_task.h"
 #include "mqtt_task.h"
 #include "gnss_task.h"
 #include "rtc_task.h"
 #include "tbr_sync_task.h"
-#include <zephyr/debug/thread_analyzer.h>
+//// #include <zephyr/debug/thread_analyzer.h>
 
 #define STACKSIZE 2048
 #define MQTT_THREAD_PRIORITY 9
@@ -69,12 +71,6 @@ K_SEM_DEFINE(block_mqtt_on_fault_sem, 0, 1);
 K_SEM_DEFINE(mqtt_lock_mutex, 0, 1);
 K_SEM_DEFINE(gnss_lock_mutex, 0, 1);
 uint16_t TBSN; //tbr serial number
-
-//Function prototypes
-static int modem_configure(void);
-
-//handlers
-static void lte_handler(const struct lte_lc_evt *const evt);
 
 //thread definitions
 K_THREAD_STACK_DEFINE(mqtt_thread_id, STACKSIZE);
@@ -131,10 +127,8 @@ static void lte_handler(const struct lte_lc_evt *const evt)
 		if(evt->rrc_mode == LTE_LC_RRC_MODE_IDLE){
 			if(!first_fix)
 				k_sem_give(&gnss_start_sem);
-
 			k_sem_give(&gnss_lock_mutex);
 			// k_sem_give(&mqtt_lock_mutex);
-
 		}
 		break;
 	case LTE_LC_EVT_PSM_UPDATE:
@@ -162,7 +156,7 @@ static void restart_on_fault(void *p1, void *p2, void *p3)
 	while(true)
 	{
 		k_sem_take(&modem_fault_sem, K_FOREVER);
-		thread_analyzer_print();
+		//thread_analyzer_print();
 	  	//sys_reboot(SYS_REBOOT_COLD);
        //  k_yield();
 		LOG_ERR("REINITALIZING MODEM!\n");
@@ -228,6 +222,7 @@ static int modem_configure(void)
 		LOG_ERR("Failed to initialize the modem library, error: %d", err);
 		return err;
 	}
+
 	
 	#if(CONFIG_MQTT_LIB_TLS)
 	/*  Store the certificate in the modem while the modem is in offline mode  */
@@ -235,15 +230,6 @@ static int modem_configure(void)
 	if (err != 0) {
 		LOG_ERR("Failed to provision certificates");
 		return 1;
-	}
-	#endif
-
-	/* lte_lc_init deprecated in >= v2.6.0 */
-	#if NCS_VERSION_NUMBER < 0x20600
-	err = lte_lc_init();
-	if (err) {
-		LOG_ERR("Failed to initialize LTE link control library, error: %d", err);
-		return err;
 	}
 	#endif
 
@@ -268,7 +254,6 @@ static int modem_configure(void)
 	if(err){
 		LOG_ERR("Date time update handler failed");
 	}	
-
 	LOG_INF("Waiting for current time");	
 	/* Wait for an event from the Date Time library. */
 	k_sem_take(&time_sem, K_MINUTES(1));
@@ -309,9 +294,7 @@ int main(void)
 		k_busy_wait(1*1000*1000*60);
 		sys_reboot(SYS_REBOOT_COLD);
 		return 1;
-	};
-
-
+	}
 	
 	if(adc_init()!=0){
 		LOG_ERR("Failed to initialize ADC");
@@ -360,7 +343,7 @@ int main(void)
 	{
 		LOG_INF("Waiting for 1 minute before restarting the chip\n");
 		k_busy_wait(1*1000*1000*60);
-		sys_reboot(SYS_REBOOT_COLD);
+ 		sys_reboot(SYS_REBOOT_COLD);
 	}
 	
 	//fault handling
